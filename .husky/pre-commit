@@ -1,0 +1,3 @@
+# Run formatting and linting on staged files
+echo "→ Running formatting and linting on staged files..."
+npx lint-staged

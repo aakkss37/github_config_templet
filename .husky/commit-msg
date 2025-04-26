@@ -1,0 +1,3 @@
+## Run commitlint check on commit message
+echo "→ Checking commit message convention..."
+npm run commitlint ${1}

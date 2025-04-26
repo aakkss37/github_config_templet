@@ -1,0 +1,152 @@
+name: Automated testing for feature branches
+
+on:
+  workflow_dispatch:
+  # push:
+  #   branches:
+  #     - "feature/**"
+
+jobs:
+  format:
+    name: Prettier formatting check
+    runs-on: [self-hosted, X64, ubuntu, Standard]
+    permissions:
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          token: ${{ secrets.GH_COM__TOKEN__NATE }}
+          node-version: 20
+          always-auth: true
+          cache: npm
+      - name: Artifactory
+        uses: mcgrawhill-llc/coaa-tokengen-github-actions/npm@v2
+        with:
+          user: ${{ secrets.MH_ARTIFACTORY_USER }}
+          key: ${{ secrets.MH_ARTIFACTORY_KEY }}
+          gh-app-id: ${{ secrets.GH_TOKEN_GEN_APP_ID }}
+          gh-private-key: ${{ secrets.GH_TOKEN_GEN_PRIVATE_KEY }}
+      - name: Dependencies
+        run: npm ci
+      - name: Formatting check
+        run: npm run format
+  lint:
+    name: ESLint check
+    runs-on: [self-hosted, X64, ubuntu, Standard]
+    permissions:
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          token: ${{ secrets.GH_COM__TOKEN__NATE }}
+          node-version: 20
+          always-auth: true
+          cache: npm
+      - name: Artifactory
+        uses: mcgrawhill-llc/coaa-tokengen-github-actions/npm@v2
+        with:
+          user: ${{ secrets.MH_ARTIFACTORY_USER }}
+          key: ${{ secrets.MH_ARTIFACTORY_KEY }}
+          gh-app-id: ${{ secrets.GH_TOKEN_GEN_APP_ID }}
+          gh-private-key: ${{ secrets.GH_TOKEN_GEN_PRIVATE_KEY }}
+      - name: Dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+  typecheck:
+    name: Typescript check
+    runs-on: [self-hosted, X64, ubuntu, Standard]
+    permissions:
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          token: ${{ secrets.GH_COM__TOKEN__NATE }}
+          node-version: 20
+          always-auth: true
+          cache: npm
+      - name: Artifactory
+        uses: mcgrawhill-llc/coaa-tokengen-github-actions/npm@v2
+        with:
+          user: ${{ secrets.MH_ARTIFACTORY_USER }}
+          key: ${{ secrets.MH_ARTIFACTORY_KEY }}
+          gh-app-id: ${{ secrets.GH_TOKEN_GEN_APP_ID }}
+          gh-private-key: ${{ secrets.GH_TOKEN_GEN_PRIVATE_KEY }}
+      - name: Dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run typecheck
+  test_unit:
+    name: Vitest unit testing
+    runs-on: [self-hosted, X64, ubuntu, Standard]
+    permissions:
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          token: ${{ secrets.GH_COM__TOKEN__NATE }}
+          node-version: 20
+          always-auth: true
+          cache: npm
+      - name: Artifactory
+        uses: mcgrawhill-llc/coaa-tokengen-github-actions/npm@v2
+        with:
+          user: ${{ secrets.MH_ARTIFACTORY_USER }}
+          key: ${{ secrets.MH_ARTIFACTORY_KEY }}
+          gh-app-id: ${{ secrets.GH_TOKEN_GEN_APP_ID }}
+          gh-private-key: ${{ secrets.GH_TOKEN_GEN_PRIVATE_KEY }}
+      - name: Dependencies
+        run: npm ci
+      - name: Tests
+        run: npm run test:unit
+  test_e2e:
+    timeout-minutes: 60
+    runs-on: [self-hosted, X64, ubuntu, Standard]
+    permissions:
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          token: ${{ secrets.GH_COM__TOKEN__NATE }}
+          node-version: 20
+          always-auth: true
+          cache: npm
+      - name: Artifactory
+        uses: mcgrawhill-llc/coaa-tokengen-github-actions/npm@v2
+        with:
+          user: ${{ secrets.MH_ARTIFACTORY_USER }}
+          key: ${{ secrets.MH_ARTIFACTORY_KEY }}
+          gh-app-id: ${{ secrets.GH_TOKEN_GEN_APP_ID }}
+          gh-private-key: ${{ secrets.GH_TOKEN_GEN_PRIVATE_KEY }}
+      - name: Dependencies
+        run: npm ci
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+      - name: Run Playwright tests
+        env:
+          AUTH_HOST: https://dq9lt5sfl8b0p.cloudfront.net
+          PLAYWRIGHT_BASE_URL: "http://localhost:3000/ix"
+        run: |
+          npm run build
+          npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30

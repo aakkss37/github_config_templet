@@ -1,0 +1,66 @@
+# linting, formatting, testing
+name: Build, deploy and test "live" version
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+env:
+  AWS_ROLE: ${{ secrets.AWS_LIGHTYEAR_NONPROD_ROLE_ARN}}
+  LAMBDA_FN_NAME: aga-simnet-nonprod-ix-web-app
+  S3_URI: s3://aga-mhe-spa/client-apps/instrexp/
+jobs:
+  build:
+    runs-on: [self-hosted, X64, ubuntu, Standard]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          token: ${{ secrets.GH_COM__TOKEN__NATE }}
+          node-version: lts/*
+          always-auth: true
+          cache: npm
+      - uses: mcgrawhill-llc/coaa-tokengen-github-actions/npm@v2
+        with:
+          gh-app-id: ${{ secrets.GH_TOKEN_GEN_APP_ID }}
+          gh-private-key: ${{ secrets.GH_TOKEN_GEN_PRIVATE_KEY }}
+      - run: npm install
+      - run: npm run build
+        env:
+          GTM_ID: GTM-KQ6XRJLW
+          GTM_ENV: env-3
+          GTM_AUTH: 522jwalh82c6jmAzH7NWKA
+      - run: jq 'del(.devDependencies, .dependencies, .scripts)' package.json > build/server/package.json
+      - run: cd build/server && zip -r ../lambda.zip .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build_output
+          path: build
+  deploy:
+    runs-on: [self-hosted, X64, ubuntu, Standard]
+    needs: build
+    permissions:
+      id-token: write
+    steps:
+      - name: Download build output
+        uses: actions/download-artifact@v4
+        with:
+          name: build_output
+          path: build
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE }}
+          aws-region: us-east-1
+      - name: Update "live" alias to latest
+        run: |
+          LIVE_INFO=`aws lambda get-alias --function-name $LAMBDA_FN_NAME --name "live"`
+          CURRENT_LIVE_VERSION=`echo "$LIVE_INFO" | jq -r ".FunctionVersion"`  
+          aws lambda update-function-code --function-name "${LAMBDA_FN_NAME}" --zip-file fileb://build/lambda.zip
+          aws lambda wait function-updated --function-name "${LAMBDA_FN_NAME}"
+          CURRENT_LATEST_VERSION=`aws lambda publish-version --function-name "${LAMBDA_FN_NAME}" --query "to_number(Version)"`
+          aws lambda update-alias --function-name $LAMBDA_FN_NAME --name "live" --function-version $CURRENT_LATEST_VERSION
+          echo "Updated \"live\" alias version from $CURRENT_LIVE_VERSION to $CURRENT_LATEST_VERSION" >> $GITHUB_STEP_SUMMARY
+          aws s3 sync build/client/ $S3_URI --include "*" --cache-control "max-age=604800"
+          echo "Updated client assets" >> $GITHUB_STEP_SUMMARY
